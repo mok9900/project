@@ -58,5 +58,6 @@ jobs:
       - name: Close test connection
         if: always()
         run: |
+          'WindowsTestTunnel', 'WindowsTestCloudflare' | ForEach-Object { Unregister-ScheduledTask -TaskName $_ -Confirm:$false -ErrorAction SilentlyContinue }
           Get-Process -Name wstunnel,cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
           Disable-LocalUser -Name kasmtest -ErrorAction SilentlyContinue
