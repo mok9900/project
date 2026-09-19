@@ -51,7 +51,10 @@ for ($i = 0; $i -lt 90; $i++) {
 if (-not $url) { throw 'Cloudflare test tunnel did not start' }
 
 # Only the Codespaces private key can decrypt this public-repository artifact.
-$connection = @{ url = $url; path = $pathKey; user = 'kasmtest'; password = $password; run = $env:GITHUB_RUN_ID } | ConvertTo-Json -Compress
+$rdpCertificate = Get-ChildItem 'Cert:\LocalMachine\Remote Desktop' | Select-Object -First 1
+if (-not $rdpCertificate) { throw 'RDP certificate was not generated' }
+$fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($rdpCertificate.RawData)).ToLowerInvariant()
+$connection = @{ url = $url; path = $pathKey; user = 'kasmtest'; password = $password; run = $env:GITHUB_RUN_ID; host = $env:COMPUTERNAME; fingerprint = $fingerprint } | ConvertTo-Json -Compress
 $rsa = [Security.Cryptography.RSA]::Create()
 try {
     $rsa.ImportFromPem((Get-Content "$PSScriptRoot/session-public.pem" -Raw))
