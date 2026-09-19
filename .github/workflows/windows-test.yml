@@ -1,0 +1,62 @@
+name: Windows test desktop via KasmVNC
+
+on:
+  push:
+    branches: [windows_test_1]
+    paths:
+      - '.github/workflows/windows-test.yml'
+      - 'windows_test/**'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Manual test session duration (15-330 minutes)'
+        required: true
+        default: '120'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-test-desktop
+  cancel-in-progress: false
+
+jobs:
+  windows-test:
+    runs-on: windows-2025
+    timeout-minutes: 350
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Prepare Windows test desktop
+        run: ./windows_test/start.ps1
+      - name: Publish encrypted connection details
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-connection-${{ github.run_id }}
+          path: ${{ runner.temp }}/windows-test/connection.enc
+          retention-days: 1
+          if-no-files-found: error
+      - name: Keep manual test session available
+        env:
+          TEST_MINUTES: ${{ inputs.minutes || '120' }}
+        run: |
+          $minutes = [int]$env:TEST_MINUTES
+          if ($minutes -lt 15 -or $minutes -gt 330) { throw 'Duration must be 15-330 minutes' }
+          $end = (Get-Date).AddMinutes($minutes)
+          "Windows Server 2025 test desktop is ready. Connect using the Codespaces KasmVNC gateway." >> $env:GITHUB_STEP_SUMMARY
+          "Session ends at $($end.ToUniversalTime().ToString('u')). Cancel this workflow to end it earlier." >> $env:GITHUB_STEP_SUMMARY
+          while ((Get-Date) -lt $end) {
+            foreach ($processName in @('wstunnel', 'cloudflared')) {
+              if (-not (Get-Process -Name $processName -ErrorAction SilentlyContinue)) { throw "$processName stopped" }
+            }
+            Start-Sleep -Seconds 30
+          }
+      - name: Close test connection
+        if: always()
+        run: |
+          Get-Process -Name wstunnel,cloudflared -ErrorAction SilentlyContinue | Stop-Process -Force
+          Disable-LocalUser -Name kasmtest -ErrorAction SilentlyContinue
