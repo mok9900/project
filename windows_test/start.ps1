@@ -26,8 +26,13 @@ tar -xzf "$root\wstunnel.tar.gz" -C $root
 if ($LASTEXITCODE -ne 0) { throw 'wstunnel extraction failed' }
 Download-Checked 'https://github.com/cloudflare/cloudflared/releases/download/2026.9.1/cloudflared-windows-amd64.exe' "$root\cloudflared.exe" '2837888cc0f5d58f15b6dc478376de90b4d3ba5241c7947455d1e0a0df429712'
 
-Start-Process "$root\wstunnel.exe" -ArgumentList @('server', '--restrict-to', '127.0.0.1:3389', '--restrict-http-upgrade-path-prefix', $pathKey, 'ws://127.0.0.1:8080') -RedirectStandardOutput "$root\wstunnel.out.log" -RedirectStandardError "$root\wstunnel.err.log" | Out-Null
-Start-Process "$root\cloudflared.exe" -ArgumentList @('tunnel', '--url', 'http://127.0.0.1:8080', '--no-autoupdate', '--protocol', 'http2') -RedirectStandardOutput "$root\cloudflared.out.log" -RedirectStandardError "$root\cloudflared.err.log" | Out-Null
+Start-Process "$root\wstunnel.exe" -ArgumentList @('server', '--restrict-to', '127.0.0.1:3389', '--restrict-http-upgrade-path-prefix', $pathKey, 'ws://127.0.0.1:28080') -RedirectStandardOutput "$root\wstunnel.out.log" -RedirectStandardError "$root\wstunnel.err.log" | Out-Null
+Start-Sleep -Seconds 3
+if (-not (Get-Process -Name wstunnel -ErrorAction SilentlyContinue)) {
+    Get-Content "$root\wstunnel.out.log", "$root\wstunnel.err.log" -ErrorAction SilentlyContinue
+    throw 'wstunnel failed during startup'
+}
+Start-Process "$root\cloudflared.exe" -ArgumentList @('tunnel', '--url', 'http://127.0.0.1:28080', '--no-autoupdate', '--protocol', 'http2') -RedirectStandardOutput "$root\cloudflared.out.log" -RedirectStandardError "$root\cloudflared.err.log" | Out-Null
 $url = $null
 for ($i = 0; $i -lt 90; $i++) {
     Start-Sleep -Seconds 2
